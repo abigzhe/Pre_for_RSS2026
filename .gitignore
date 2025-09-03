@@ -1,2 +1,69 @@
 navi_v1.0/
-navi_v1.0.tar.gz
+# ----------------------
+# 常见操作系统临时文件
+# ----------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------
+# Python 相关
+# ----------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+.Python
+
+# 虚拟环境
+.env/
+.venv/
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb~
+
+# ----------------------
+# 数据集和模型文件
+# ----------------------
+# 常见数据目录
+data/
+dataset/
+datasets/
+
+# 模型权重（大文件）
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.onnx
+*.pb
+
+# 压缩包/归档文件
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# ----------------------
+# 训练和实验输出
+# ----------------------
+logs/
+results/
+outputs/
+runs/
+wandb/
+checkpoints/
+events.out.tfevents.*
+
+# ----------------------
+# 编辑器/IDE 配置
+# ----------------------
+.vscode/
+.idea/
+*.swp
+*.swo
