@@ -160,8 +160,15 @@ if __name__ == '__main__':
     else:
         raise ValueError('Cannot specify more than two integers for --resize')
 
+    # with open(opt.input_pairs, 'r') as f:
+    #     pairs = [l.split() for l in f.readlines()]
+    pairs = []
     with open(opt.input_pairs, 'r') as f:
-        pairs = [l.split() for l in f.readlines()]
+        for line in f:
+            if line.strip() == "":
+                continue
+            name0, name1 = line.strip().split()
+            pairs.append([name0, name1])
 
     if opt.max_length > -1:
         pairs = pairs[0:np.min([len(pairs), opt.max_length])]
@@ -259,10 +266,15 @@ if __name__ == '__main__':
             rot0, rot1 = 0, 0
 
         # Load the image pair.
+        # image0, inp0, scales0 = read_image(
+        #     input_dir / name0, device, opt.resize, rot0, opt.resize_float)
+        # image1, inp1, scales1 = read_image(
+        #     input_dir / name1, device, opt.resize, rot1, opt.resize_float)
         image0, inp0, scales0 = read_image(
-            input_dir / name0, device, opt.resize, rot0, opt.resize_float)
+            Path(name0), device, opt.resize, rot0, opt.resize_float)
         image1, inp1, scales1 = read_image(
-            input_dir / name1, device, opt.resize, rot1, opt.resize_float)
+            Path(name1), device, opt.resize, rot1, opt.resize_float)
+
         if image0 is None or image1 is None:
             print('Problem reading image pair: {} {}'.format(
                 input_dir/name0, input_dir/name1))
@@ -399,27 +411,27 @@ if __name__ == '__main__':
 
         timer.print('Finished pair {:5} of {:5}'.format(i, len(pairs)))
 
-    if opt.eval:
-        # Collate the results into a final table and print to terminal.
-        pose_errors = []
-        precisions = []
-        matching_scores = []
-        for pair in pairs:
-            name0, name1 = pair[:2]
-            stem0, stem1 = Path(name0).stem, Path(name1).stem
-            eval_path = output_dir / \
-                '{}_{}_evaluation.npz'.format(stem0, stem1)
-            results = np.load(eval_path)
-            pose_error = np.maximum(results['error_t'], results['error_R'])
-            pose_errors.append(pose_error)
-            precisions.append(results['precision'])
-            matching_scores.append(results['matching_score'])
-        thresholds = [5, 10, 20]
-        aucs = pose_auc(pose_errors, thresholds)
-        aucs = [100.*yy for yy in aucs]
-        prec = 100.*np.mean(precisions)
-        ms = 100.*np.mean(matching_scores)
-        print('Evaluation Results (mean over {} pairs):'.format(len(pairs)))
-        print('AUC@5\t AUC@10\t AUC@20\t Prec\t MScore\t')
-        print('{:.2f}\t {:.2f}\t {:.2f}\t {:.2f}\t {:.2f}\t'.format(
-            aucs[0], aucs[1], aucs[2], prec, ms))
+    # if opt.eval:
+    #     # Collate the results into a final table and print to terminal.
+    #     pose_errors = []
+    #     precisions = []
+    #     matching_scores = []
+    #     for pair in pairs:
+    #         name0, name1 = pair[:2]
+    #         stem0, stem1 = Path(name0).stem, Path(name1).stem
+    #         eval_path = output_dir / \
+    #             '{}_{}_evaluation.npz'.format(stem0, stem1)
+    #         results = np.load(eval_path)
+    #         pose_error = np.maximum(results['error_t'], results['error_R'])
+    #         pose_errors.append(pose_error)
+    #         precisions.append(results['precision'])
+    #         matching_scores.append(results['matching_score'])
+    #     thresholds = [5, 10, 20]
+    #     aucs = pose_auc(pose_errors, thresholds)
+    #     aucs = [100.*yy for yy in aucs]
+    #     prec = 100.*np.mean(precisions)
+    #     ms = 100.*np.mean(matching_scores)
+    #     print('Evaluation Results (mean over {} pairs):'.format(len(pairs)))
+    #     print('AUC@5\t AUC@10\t AUC@20\t Prec\t MScore\t')
+    #     print('{:.2f}\t {:.2f}\t {:.2f}\t {:.2f}\t {:.2f}\t'.format(
+    #         aucs[0], aucs[1], aucs[2], prec, ms))
