@@ -27,7 +27,8 @@ import numpy as np
 import PIL.Image
 import trimesh
 import torch as t
-from IPython.core import display
+#from IPython.core import display
+from IPython.display import display, HTML
 from gl import scene_renderer
 
 import data_util
@@ -130,8 +131,8 @@ def get_html_for_images(*orig_images, fmt="png", dim_name="width"):
 
 def display_images(*orig_images, dim_name="width", **kwargs):
   """Display images in a IPython environment"""
-  display.display(
-      display.HTML(
+  display(
+      HTML(
           get_html_for_images(
               *orig_images, dim_name=dim_name, **kwargs)))
 
