@@ -88,12 +88,17 @@ class AverageTimer:
             if self.will_print[key]:
                 print('%s=%.3f' % (key, val), end=' ')
                 total += val
-        print('total=%.3f sec {%.1f FPS}' % (total, 1./total), end=' ')
+        if total <= 1e-8:
+            fps_str = 'inf'
+        else:
+            fps_str = f'{1./total:.1f}'
+        print('total=%.3f sec {%s FPS}' % (total, fps_str), end=' ')
         if self.newline:
             print(flush=True)
         else:
             print(end='\r', flush=True)
         self.reset()
+
 
 
 class VideoStreamer:
