@@ -59,7 +59,8 @@ runs/
 wandb/
 checkpoints/
 events.out.tfevents.*
-
+navi_v1.0/
+navi_dense_corr/
 # ----------------------
 # 编辑器/IDE 配置
 # ----------------------
