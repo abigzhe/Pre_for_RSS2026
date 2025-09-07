@@ -1,0 +1,10 @@
+tensorflow>=2.8
+numpy
+scipy
+opencv-python>=4.5
+opencv-contrib-python>=4.5
+
+tqdm
+pyyaml
+flake8
+jupyter
