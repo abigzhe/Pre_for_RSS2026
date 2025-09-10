@@ -15,3 +15,11 @@ findrandomall.py Find all picking images.
 mnn_matching.py Use mnn to match.
 nn_radio.py Use nn-radio to match.
 visualize_features.py Visualize the points.
+
+
+need:
+
+ 1.if qianjingfenge is need
+ 2.how to change patch ↔ to 像素 ↔ 像素
+ 3.had point and how to give them the other descriptors
+ 4. evaluadte...

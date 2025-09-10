@@ -3,9 +3,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-#import tensorflow as tf  # noqa: E402
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import tensorflow as tf  # noqa: E402
+
 from superpoint.settings import EXPER_PATH  # noqa: E402
 
 
@@ -105,10 +104,10 @@ if __name__ == '__main__':
     img_size = (args.W, args.H)
     keep_k_best = args.k_best
 
-    # weights_root_dir = Path(EXPER_PATH, 'saved_models')
-    # weights_root_dir.mkdir(parents=True, exist_ok=True)
-    # weights_dir = Path(weights_root_dir, weights_name)
-    weights_dir = Path(weights_name)
+    weights_root_dir = Path(EXPER_PATH, 'saved_models')
+    weights_root_dir.mkdir(parents=True, exist_ok=True)
+    weights_dir = Path(weights_root_dir, weights_name)
+
     graph = tf.Graph()
     with tf.Session(graph=graph) as sess:
         tf.saved_model.loader.load(sess,
