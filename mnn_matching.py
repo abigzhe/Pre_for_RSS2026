@@ -1,20 +1,21 @@
+#!/usr/bin/env python3
 import cv2
 import numpy as np
 from pathlib import Path
+import random
 
-
-# ============ 固定路径 ============
-pairs_file = Path("/data1/home/limingzhe/abigzhe_dinopro/result/randomall/pairs_eval.txt")
-features_root = Path("/data1/home/limingzhe/abigzhe_dinopro/result/randomall/superpoint&sift/features")
-images_root = Path("/data1/home/limingzhe/abigzhe_dinopro/result/randomall/images")
-output_root = Path("/data1/home/limingzhe/abigzhe_dinopro/result/randomall/superpoint&sift/matching")
+# ============ 配置部分 ============
+pairs_file = Path("/data1/home/limingzhe/abigzhe_dinopro/navi_v1.0/pairs.txt")
+features_root = Path("/data1/home/limingzhe/abigzhe_dinopro/result/all/superpoint/pointmask_cpu")
+images_root = Path("/data1/home/limingzhe/abigzhe_dinopro/navi_v1.0")
+output_root = Path("/data1/home/limingzhe/abigzhe_dinopro/result/all/superpoint/match")
 
 methods = ["sift", "superpoint"]
 
+MAX_VISUALIZATIONS = 20  # 只画 20 张图
 
-# ============ 函数部分 ============
+
 def match_mnn(desc1, desc2, max_desc=50000):
-    """Mutual Nearest Neighbor (MNN) matching with封顶抽样"""
     if desc1 is None or desc2 is None:
         return []
     if not isinstance(desc1, np.ndarray) or not isinstance(desc2, np.ndarray):
@@ -27,11 +28,9 @@ def match_mnn(desc1, desc2, max_desc=50000):
         print(f"⚠️ 描述子维度不一致: {desc1.shape} vs {desc2.shape}")
         return []
 
-    # 转 float32，保证 OpenCV 能处理
     desc1 = np.ascontiguousarray(desc1, dtype=np.float32)
     desc2 = np.ascontiguousarray(desc2, dtype=np.float32)
 
-    # ⚡ 封顶：随机抽样，避免太大导致 OpenCV 报错
     if len(desc1) > max_desc:
         idx1 = np.random.choice(len(desc1), max_desc, replace=False)
         desc1 = desc1[idx1]
@@ -46,27 +45,21 @@ def match_mnn(desc1, desc2, max_desc=50000):
 
     bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 
-    # 1 -> 2
     matches_12 = bf.knnMatch(desc1, desc2, k=1)
     nn12 = {i: m[0] for i, m in enumerate(matches_12) if len(m) > 0}
 
-    # 2 -> 1
     matches_21 = bf.knnMatch(desc2, desc1, k=1)
     nn21 = {i: m[0] for i, m in enumerate(matches_21) if len(m) > 0}
 
-    # mutual check
     mutual_matches = []
     for i, m in nn12.items():
         j = m.trainIdx
         if j in nn21 and nn21[j].trainIdx == i:
-            # 恢复到原始索引
             m.queryIdx = idx1[i]
             m.trainIdx = idx2[j]
             mutual_matches.append(m)
 
     return sorted(mutual_matches, key=lambda x: x.distance)
-
-
 
 
 def load_features(npz_file):
@@ -81,9 +74,7 @@ def load_features(npz_file):
     return kps, desc, data["keypoints"]
 
 
-
 def draw_matches_thick(img1, kps1, img2, kps2, matches, max_display=100, thickness=2):
-    """拼接两张图并画匹配，支持加粗线条"""
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
     out = np.zeros((max(h1, h2), w1 + w2, 3), dtype=np.uint8)
@@ -102,105 +93,67 @@ def draw_matches_thick(img1, kps1, img2, kps2, matches, max_display=100, thickne
     return out
 
 
-def find_feature_file(features_root, scene, filename, method):
-    scene_path = normalize_scene(scene)
-    target = filename.replace(".jpg", f".{method}.npz")
-    search_dir = features_root / scene_path
+def find_feature_file(features_root, image_path, method):
+    rel_path = Path(image_path).relative_to(images_root)
+    target = rel_path.with_suffix(f".{method}.npz").name
+    search_dir = features_root / rel_path.parent
     candidates = list(search_dir.rglob(target))
     if len(candidates) == 0:
         return None
     return candidates[0]
 
 
-def find_image_file(images_root, scene, filename):
-    scene_path = normalize_scene(scene)
-    search_dir = images_root / scene_path
-    candidates = list(search_dir.rglob(filename))
-    if len(candidates) == 0:
-        return None
-    return candidates[0]
-
-
-def normalize_scene(scene: str) -> str:
-    """
-    把 pairs_eval.txt 中的 scene 转换成实际目录结构
-    - 第一个 '-' 之前保持不变
-    - 第二个 '-' 转换成 '/'
-    - 之后的 '-' 保持不变
-    """
-    parts = scene.split("-", 2)  # 最多切两次
-    if len(parts) == 1:
-        return scene
-    elif len(parts) == 2:
-        return parts[0] + "/" + parts[1]
-    else:
-        # 前两段变成路径，后面保持原样
-        return parts[0] + "/" + parts[1] + "-" + parts[2]
-
-
-# ============ 主流程 ============
 def main():
-    # ⚡ 跳过 pairs_eval.txt 的第一行（header）
-    pairs = [line.strip().split(",") for line in open(pairs_file, "r").readlines()[1:]]
-    print(f"找到 {len(pairs)} 对图像对")
+    all_pairs = [line.strip().split() for line in open(pairs_file, "r") if line.strip()]
+    print(f"总共 {len(all_pairs)} 对图像对")
+
+    # 前 MAX_VISUALIZATIONS 对用于可视化
+    vis_indices = set(range(min(MAX_VISUALIZATIONS, len(all_pairs))))
 
     for method in methods:
-        out_dir = output_root / f"{method}+mnn"
-        vis_dir = out_dir / "vis"
-        npz_dir = out_dir / "npz"
-        vis_dir.mkdir(parents=True, exist_ok=True)
-        npz_dir.mkdir(parents=True, exist_ok=True)
+        # npz 根目录（保持原始层级）
+        npz_root = output_root / f"{method}+mnn_npz"
+        vis_root = output_root / f"{method}+mnn_vis20"
 
-        for scene, f1, f2 in pairs:
-            # 输出路径：保持目录层级
-            scene_path = Path(scene.replace("-", "/"))
-            scene_npz_dir = npz_dir / scene_path
-            scene_vis_dir = vis_dir / scene_path
-            scene_npz_dir.mkdir(parents=True, exist_ok=True)
-            scene_vis_dir.mkdir(parents=True, exist_ok=True)
-            out_npz = scene_npz_dir / f"{Path(f1).stem}_{Path(f2).stem}.npz"
-            out_vis = scene_vis_dir / f"{Path(f1).stem}_{Path(f2).stem}.jpg"
-
-            # ⚡ 如果两个结果都存在，跳过
-            if out_npz.exists() and out_vis.exists():
-                print(f"⏭️ 跳过 {scene} {f1} {f2}, 匹配已存在")
-                continue
-
-            feat1_file = find_feature_file(features_root, scene, f1, method)
-            feat2_file = find_feature_file(features_root, scene, f2, method)
-            img1_file = find_image_file(images_root, scene, f1)
-            img2_file = find_image_file(images_root, scene, f2)
+        for idx, (img1_path, img2_path) in enumerate(all_pairs):
+            feat1_file = find_feature_file(features_root, img1_path, method)
+            feat2_file = find_feature_file(features_root, img2_path, method)
 
             if feat1_file is None or feat2_file is None:
-                print(f"⚠️ 跳过 {scene} {f1} {f2}, 特征不存在")
-                continue
-            if img1_file is None or img2_file is None:
-                print(f"⚠️ 跳过 {scene} {f1} {f2}, 图像不存在")
+                print(f"⚠️ 特征不存在，跳过: {img1_path}, {img2_path}")
                 continue
 
-            # 加载特征
             kps1, desc1, pts1 = load_features(feat1_file)
             kps2, desc2, pts2 = load_features(feat2_file)
 
-            # 匹配
-            #print(f"调试: {scene}, {f1}, {f2}, desc1={None if desc1 is None else desc1.shape}, desc2={None if desc2 is None else desc2.shape}")
             matches = match_mnn(desc1, desc2)
             if len(matches) == 0:
-                print(f"⚠️ 跳过 {scene} {f1}-{f2}, 无有效匹配")
+                print(f"⚠️ 无有效匹配，跳过: {img1_path}, {img2_path}")
                 continue
 
-            print(f"[{method}] {scene}, {f1}-{f2}: {len(matches)} matches")
+            print(f"[{method}] {idx+1}/{len(all_pairs)} 匹配数: {len(matches)}")
 
-            # 保存 npz
+            # 保存 npz（全部保存）
+            rel_dir = Path(img1_path).relative_to(images_root).parent
+            npz_dir = npz_root / rel_dir
+            npz_dir.mkdir(parents=True, exist_ok=True)
+            out_npz = npz_dir / f"{Path(img1_path).stem}_{Path(img2_path).stem}.npz"
+
             matched_pts1 = np.array([pts1[m.queryIdx] for m in matches], dtype=np.float32)
             matched_pts2 = np.array([pts2[m.trainIdx] for m in matches], dtype=np.float32)
             np.savez(out_npz, pts1=matched_pts1, pts2=matched_pts2)
 
-            # 可视化
-            img1 = cv2.imread(str(img1_file))
-            img2 = cv2.imread(str(img2_file))
-            vis_img = draw_matches_thick(img1, kps1, img2, kps2, matches, max_display=10, thickness=10)
-            cv2.imwrite(str(out_vis), vis_img)
+            # 只前 MAX_VISUALIZATIONS 对画可视化
+            if idx in vis_indices:
+                vis_dir = vis_root / rel_dir
+                vis_dir.mkdir(parents=True, exist_ok=True)
+
+                img1 = cv2.imread(img1_path)
+                img2 = cv2.imread(img2_path)
+                vis_img = draw_matches_thick(img1, kps1, img2, kps2,
+                                             matches, max_display=10, thickness=10)
+                out_vis = vis_dir / f"{Path(img1_path).stem}_{Path(img2_path).stem}.jpg"
+                cv2.imwrite(str(out_vis), vis_img)
 
 
 if __name__ == "__main__":
